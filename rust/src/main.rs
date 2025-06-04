@@ -94,11 +94,11 @@ async fn start_server(app: Router) -> anyhow::Result<()> {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to bind to port 3000: {}", e))?;
 
-    println!("Server running on http://0.0.0.0:3000");
+    println!("Yay! Server running on http://0.0.0.0:3000");
 
     axum::serve(listener, app)
         .await
-        .map_err(|e| anyhow::anyhow!("Failed to start server: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Oh noes! Failed to start server: {}", e))?;
 
     Ok(())
 }

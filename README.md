@@ -257,3 +257,113 @@ CMD ["/app/fizzbuzz", "serve"]
 * підтримують часові пояси
 * мають CA сертифікати, які використовуються для роботи по HTTPS
 * використовують nonroot користувача
+
+## Rust
+### 1. Створення базового Dockerfile та docker-compose.yml
+Базовий знімок, який було використано: `rust:1.87.0`
+
+Dockerfile:
+```dockerfile
+FROM rust:1.87.0
+
+WORKDIR /app
+
+COPY . .
+
+RUN cargo build --release
+
+EXPOSE 3000
+
+CMD ["/app/target/release/heads_or_tails"]
+```
+
+docker-compose.yml:
+```
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgres://postgres:password@db:5432/heads_or_tails
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=heads_or_tails
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+```
+
+Метрики:
+
+| Час збірки | Розмір знімку |
+| - | - |
+| 67.8s | 2.96GB |
+
+Змінимо файл `static/index.html`.
+
+Метрики після змін:
+
+| Час збірки | Розмір знімку |
+| - | - |
+| 54.2s | 2.96GB |
+
+Очевидно, що така наївна імплементація Dockerfile призвела не лише до тривалої
+збірки, але й до значного розміру створеного знімку, тож зосередимося на
+оптимізації цих двох характеристик.
+
+### 2. Оптимізація кешування
+Перевикористання залежностей дозволить нам значно скоротити час збірки знімку,
+проте, оскільки `cargo` не має можливості побудови лише залежностей, вирішення
+цієї проблеми потребує деяких костилів.
+
+Dockerfile:
+```dockerfile
+FROM rust:1.87.0
+
+WORKDIR /app
+
+# Build dependencies first
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release
+
+# then the whole thing
+COPY src ./src
+RUN cargo build --release
+
+COPY static ./static
+
+EXPOSE 3000
+
+CMD ["/app/target/release/heads_or_tails"]
+```
+
+Метрики:
+
+| Час збірки | Розмір знімку |
+| - | - |
+| 58.3s | 2.2GB |
+
+Змінимо файл `src/main.rs`.
+
+Метрики після змін:
+
+| Час збірки | Розмір знімку |
+| - | - |
+| 7.3s | 2.2GB |
+
+Наш час збірки скоротився з 58.3s до непристойно швидких 7.3s! Якби це було
+побачення, хтось би вже вибачався. Але якщо серйозно, то напрочуд дивно, що
+така опція досі не є вбудованою в `cargo`, хоча такий
+[issue](https://github.com/rust-lang/cargo/issues/2644) існує ще з 2016 року.
