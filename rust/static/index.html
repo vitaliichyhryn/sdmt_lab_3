@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Heads or Tails</title>
+    <style>
+        body { text-align: center; }
+    </style>
+</head>
+<body>
+    <h1>Heads or Tails</h1>
+
+    <button onclick="tossCoin()">Flip the Coin</button>
+    <p id="result"></p>
+
+    <h2>History</h2>
+    <div id="history"></div>
+
+    <script>
+        async function tossCoin() {
+            fetch('/api/toss', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('result').innerText = data.result;
+                    loadHistory();
+                });
+        }
+
+        async function loadHistory() {
+            fetch('/api/history')
+                .then(r => r.json())
+                .then(history => {
+                    let html = '';
+                    for (let toss of history) {
+                        html += '<p>' + toss.result + ' on ' + new Date(toss.timestamp).toLocaleString() + '</p>';
+                    }
+                    document.getElementById('history').innerHTML = html;
+                });
+        }
+
+        loadHistory();
+    </script>
+</body>
+</html>
