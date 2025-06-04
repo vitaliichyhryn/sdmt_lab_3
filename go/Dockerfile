@@ -1,11 +1,19 @@
-FROM golang:1.24.3-alpine
+FROM golang:1.24.3-alpine AS builder
 
-WORKDIR /app/fizzbuzz
-
-EXPOSE 8080
+WORKDIR /build
 
 COPY . .
 
-RUN go build -o build/fizzbuzz
+RUN go mod download
+RUN go build -o fizzbuzz
 
-CMD ["./build/fizzbuzz", "serve"]
+FROM scratch
+
+WORKDIR /app
+
+COPY --from=builder /build/fizzbuzz .
+COPY --from=builder /build/templates ./templates
+
+EXPOSE 8080
+
+CMD ["/app/fizzbuzz", "serve"]
