@@ -219,3 +219,41 @@ COPY --from=builder /build/templates ./templates
 Однак, варто зазначити, що знімок `scratch` не містить ніяких вбудованих
 утиліт, через що, окрім виконання бінарнику, в ньому неможливо робити щось
 більше, накшталт дебагінгу.
+
+### 3. Distroless
+Базовий знімок, який було використано: `distroless/static:nonroot`
+
+Dockerfile:
+```dockerfile
+FROM golang:1.24.3-alpine AS builder
+
+WORKDIR /build
+
+COPY . .
+
+RUN go mod download
+RUN go build -o fizzbuzz
+
+FROM gcr.io/distroless/static:nonroot
+
+WORKDIR /app
+
+COPY --from=builder /build/fizzbuzz .
+COPY --from=builder /build/templates ./templates
+
+EXPOSE 8080
+
+CMD ["/app/fizzbuzz", "serve"]
+```
+
+Метрики:
+
+| Час збірки | Розмір знімку |
+| - | - |
+| 15.6s | 14.5MB |
+
+Знімки `distroless` мають кілька значних переваг над `scratch`:
+* мають базову файлову структуру
+* підтримують часові пояси
+* мають CA сертифікати, які використовуються для роботи по HTTPS
+* використовують nonroot користувача

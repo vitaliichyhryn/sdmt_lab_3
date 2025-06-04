@@ -7,7 +7,7 @@ COPY . .
 RUN go mod download
 RUN go build -o fizzbuzz
 
-FROM scratch
+FROM gcr.io/distroless/static:nonroot
 
 WORKDIR /app
 
