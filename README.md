@@ -27,5 +27,27 @@ pip freeze > requirements.txt
 
 З визначених у Dockerfile команд, лише одна була закешована:
 ```
-=> CACHED [2/4] WORKDIR /app/spaceship 0.0s
+=> CACHED [2/4] WORKDIR /app/spaceship  0.0s
+```
+
+### 3. Оптимізація кешування
+Метрики першої збірки після оптимізації Dockerfile:
+
+| Час збірки | Розмір знімку |
+| - | - |
+| 12.3s | 1.12GB |
+
+Після першої збірки зміни було знову внесено у файл `build/index.html`.
+
+Метрики:
+
+| Час збірки | Розмір знімку |
+| - | - |
+| 2.7s | 1.12GB |
+
+З визначених у Dockerfile команд, були закешовані:
+```
+=> CACHED [2/5] WORKDIR /app/spaceship                              0.0s
+=> CACHED [3/5] COPY requirements.txt .                             0.0s
+=> CACHED [4/5] RUN pip install --no-cache-dir -r requirements.txt  0.0s
 ```
