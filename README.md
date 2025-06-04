@@ -367,3 +367,107 @@ CMD ["/app/target/release/heads_or_tails"]
 побачення, хтось би вже вибачався. Але якщо серйозно, то напрочуд дивно, що
 така опція досі не є вбудованою в `cargo`, хоча такий
 [issue](https://github.com/rust-lang/cargo/issues/2644) існує ще з 2016 року.
+
+### 3. Багатоетапна збірка
+
+Dockerfile:
+```dockerfile
+FROM rust:1.87.0-alpine AS builder
+
+WORKDIR /app
+
+# Install musl-dev for static build
+RUN apk add --no-cache musl-dev
+
+# Add static target
+RUN rustup target add x86_64-unknown-linux-musl
+
+# Build dependencies first
+COPY Cargo.toml Cargo.lock ./
+RUN cargo fetch
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release --target x86_64-unknown-linux-musl
+
+# then the whole thing
+COPY src ./src
+RUN cargo build --release --target x86_64-unknown-linux-musl
+
+FROM gcr.io/distroless/static:nonroot
+
+WORKDIR /app
+
+COPY static ./static
+
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/heads_or_tails .
+
+EXPOSE 3000
+
+CMD ["/app/heads_or_tails"]
+```
+
+Метрики:
+
+| Час збірки | Розмір знімку |
+| - | - |
+| 120.1s | 2.54MB |
+
+Змінимо файл `src/main.rs`.
+
+Метрики після змін:
+
+| Час збірки | Розмір знімку |
+| - | - |
+| 19.4s | 8.36MB |
+
+Важко однозначно оцінити успішність цієї оптимізації. З одного боку, нам
+вдалося зменшити розмір знімка майже в тисячу разів порівняно з попередньою
+версією Dockerfile. З іншого — суттєво зріс час збірки, хоча ситуацію частково
+рятує кешування.
+
+A new (old) challenger appears!
+
+Dockerfile:
+```dockerfile
+FROM rust:1.87.0-slim AS builder
+
+WORKDIR /app
+
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo fetch
+RUN cargo build --release
+
+COPY src ./src
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+
+WORKDIR /app
+
+COPY --from=builder /app/target/release/heads_or_tails .
+
+COPY static ./static
+
+EXPOSE 3000
+
+CMD ["/app/heads_or_tails"]
+```
+
+Метрики:
+
+| Час збірки | Розмір знімку |
+| - | - |
+| 62.4s | 75.2MB |
+
+Змінимо файл `src/main.rs`.
+
+Метрики після змін:
+
+| Час збірки | Розмір знімку |
+| - | - |
+| 7.0s | 81MB |
+
+Використовуючи `-slim` знімки нам вдалося відновити баланс: ми повністю
+відновили *blazingly fast* швидкість збірки, трохи жертвуючи розміром знімку.
+На мою думку, даний підхід є найкращим, оскільки нема нічого гіршого ніж
+очікування довгого білду.
